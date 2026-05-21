@@ -118,7 +118,7 @@ def train(args):
 
     # Load Generative model if it exists.
     if os.path.exists(g_model_path):
-        g_model = DynamicAutoencoder2D.load(g_model_path)
+        g_model = DynamicAutoencoder2D.load_checkpoint(g_model_path)
     else:
         g_model = DynamicAutoencoder2D(args.latent_dims, args.channels, args.g_hidden_size, args.unflatten_shape, args.num_quantizers, 
                                 args.codebook_size, args.no_attn, args.no_bitnet, args.unet_style, args.skip_dropout, args.num_heads, args.conv_bottleneck)
@@ -127,9 +127,9 @@ def train(args):
 
     # Load the Discriminative model if it exists.
     if os.path.exists(d_model_path):
-        d_model = PatchGAN.load(d_model_path) #SyntheticImagePrediction.load(d_model_path)
+        d_model = PatchGAN.load_checkpoint(d_model_path)
     else:
-        d_model = PatchGAN(args.channels) #SyntheticImagePrediction(args.d_hidden_size, args.d_hidden_size_2, args.channels, args.no_bitnet, args.unet_style)
+        d_model = PatchGAN(args.channels, args.d_start_dims, args.d_depth, args.d_kernel_size, args.d_padding, args.d_leaky_relu_slope)
 
     d_model.print_parameters()
 
@@ -332,8 +332,8 @@ def train(args):
             # Using the set patience_loss as the key, check if the model has improved.
             if val_losses[patience_loss] < lowest_loss:
                 lowest_loss = val_losses[patience_loss] # Set the new lowest loss.
-                accelerator.unwrap_model(g_model).save(args.output_g_model) # Save Generative model if there's improvement.
-                accelerator.unwrap_model(d_model).save(args.output_d_model) # Save the Discriminator model if there's imporovment.
+                accelerator.unwrap_model(g_model).save_checkpoint(args.output_g_model) # Save Generative model if there's improvement.
+                accelerator.unwrap_model(d_model).save_checkpoint(args.output_d_model) # Save the Discriminator model if there's imporovment.
                 current_patience = args.patience # Reset the current patience.
             
             else:

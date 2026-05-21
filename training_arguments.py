@@ -41,8 +41,11 @@ def get_arguments():
     disc = p.add_argument_group("Discriminative Model", description="Arguments that modify how the discriminative model behaves.")
     disc.add_argument("--input_d_model", type=str, default="models/synthetic_prediction")
     disc.add_argument("--output_d_model", type=str, default="models/synthetic_prediction")
-    disc.add_argument("--d_hidden_size", type=int, default=100352)
-    disc.add_argument("--d_hidden_size_2", type=int, default=512)
+    disc.add_argument("--d_start_dim", type=int, default=64)
+    disc.add_argument("--d_depth", type=int, default=3)
+    disc.add_argument("--d_kernel_size", type=int, default=4)
+    disc.add_argument("--d_padding", type=int, default=1)
+    disc.add_argument("--d_leaky_relu_slope", type=float, default=0.2)
 
     # Training
     training = p.add_argument_group("Training", description="Arguments that modify the training behaviour.")

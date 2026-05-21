@@ -321,14 +321,6 @@ class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
         return z, recon, indices, None
 
 
-class NoisePrediction(nn.Module, ModuleTools):
-    def __init__(self, hidden_size, channels):
-        super().__init__()
-        self.config = {
-            "hidden_size": hidden_size,
-        }    
-
-
 if __name__ == "__main__":
     rand = torch.randn((2, 3, 128, 128))
 
