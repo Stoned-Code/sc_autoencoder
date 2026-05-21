@@ -1,0 +1,1 @@
+accelerate launch train_autoencoder.py -b 128 --kl_loss_weight 1e-6 --mmd_loss_weight 1.1 --adv_loss_weight 0.5 --train_workers 10 --num_heads 2 --val_workers 4 -e 100 --conv_bottleneck 8 --input_g_model "models/conv_img_ae" --output_g_model "models/conv_img_ae" --patience 15
