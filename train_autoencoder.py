@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 from tqdm import tqdm
 
 from modules.dynamic_ae import DynamicAutoencoder2D
@@ -201,6 +202,8 @@ def train(args):
 
     # Max out the lowest loss for early stopping.
     lowest_loss = float("inf")
+    
+    df = None
 
     # Iterrate over epochs.
     for e in range(epochs):
@@ -320,6 +323,13 @@ def train(args):
             # Log the losses of the training set and the validation set.
             data = train_losses | val_losses
             accelerator.print({k: round(v, 5) for k, v in data.items()})
+            
+            # Create DataFrame if it doesn't exist.
+            if df is None:
+                df = pd.DataFrame(columns=list(data.keys()))
+            
+            # Add the epoch's data to the dataframe.
+            df.loc[len(df)] = data
 
             # Log the codebook usage using the most recent returned codebook indices.
             if indices is not None:
@@ -355,6 +365,7 @@ def train(args):
     if torch.cuda.is_available() and device == "cuda":
         torch.cuda.empty_cache()
 
+    return df
 
 if __name__ == "__main__":
     # Grab arguments for training
@@ -362,7 +373,9 @@ if __name__ == "__main__":
 
     accelerator = Accelerator(gradient_accumulation_steps=4, mixed_precision="bf16", log_with="tensorboard")
 
-    train(args)
+    df = train(args)
+    
+    df.to_csv("training_stats.csv")
 
     accelerator.wait_for_everyone()
     accelerator.end_training()

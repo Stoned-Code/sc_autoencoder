@@ -61,9 +61,9 @@ def get_arguments():
     loss_weights.add_argument("--recon_loss_weight", type=float, default=1.0)
     loss_weights.add_argument("--commit_loss_weight", type=float, default=0.05)
     loss_weights.add_argument("--noise_loss_weight", type=float, default=0.25)
-    loss_weights.add_argument("--kl_loss_weight", type=float, default=1.0)
-    loss_weights.add_argument("--mmd_loss_weight", type=float, default=1.0)
-    loss_weights.add_argument("--adv_loss_weight", type=float, default=0.05)
+    loss_weights.add_argument("--kl_loss_weight", type=float, default=1e-5)
+    loss_weights.add_argument("--mmd_loss_weight", type=float, default=1.1)
+    loss_weights.add_argument("--adv_loss_weight", type=float, default=0.5)
 
     args = p.parse_args()
 

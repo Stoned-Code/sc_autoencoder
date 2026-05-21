@@ -5,6 +5,13 @@ A repository I created to train an autoencoder. The autoencoder takes an image a
 The dataset was processed into unstructured [WebDataset](https://github.com/webdataset/webdataset) format without any labels.
 - [ILSVRC/imagenet-1k](https://huggingface.co/datasets/ILSVRC/imagenet-1k)
 
+## Setup
+This is running on an old PC that I gave to my father. When he got a new PC he gave it back to me and I upgraded it with a new GPU and new HDD for data storage turning it into my own ML server.
+- **OS**: Ubuntu 26.04 Server
+- **GPU**: RTX 5060 ti (16GB VRAM)
+- **Python Version**: 3.12
+- **ML Framework**: Pytorch
+
 ## Getting Started
 Create conda environment
 ```
