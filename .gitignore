@@ -1,0 +1,8 @@
+*__pycache__/
+.ipynb_checkpoints/
+*.csv
+*.jpg
+models/
+*.key
+dataset/
+.conda/
