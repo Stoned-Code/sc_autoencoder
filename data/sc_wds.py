@@ -1,6 +1,7 @@
 import webdataset as wds
 import os
 from glob import glob
+from tqdm import tqdm
 
 class SCWDS:
     def __init__(self):
@@ -53,13 +54,13 @@ class SCWebDatasets:
             dataset = wds.WebDataset(shards)
             length = 0
 
-            for _ in tqdm.tqdm(dataset, desc="Getting Dataset Length"):
+            for _ in tqdm(dataset, desc="Getting Dataset Length"):
                 length += 1
 
             return length
         else:
             length = 0
-            for _ in tqdm.tqdm(path, desc="Getting Dataset Length"):
+            for _ in tqdm(path, desc="Getting Dataset Length"):
                 length += 1
 
             return length
