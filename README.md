@@ -2,9 +2,8 @@
 A repository I created to train an autoencoder.
 
 ## Datasets
-* SFW
-    - [ILSVRC/imagenet-1k](https://huggingface.co/datasets/ILSVRC/imagenet-1k)
-    - [Tagged Anime Illustrations](https://www.kaggle.com/datasets/mylesoneill/tagged-anime-illustrations)
+- [ILSVRC/imagenet-1k](https://huggingface.co/datasets/ILSVRC/imagenet-1k)
+- [Tagged Anime Illustrations](https://www.kaggle.com/datasets/mylesoneill/tagged-anime-illustrations)
 
 ## Getting Started
 Create conda environment
