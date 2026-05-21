@@ -1,9 +1,9 @@
 # Autoencoder Trainer
-A repository I created to train an autoencoder.
+A repository I created to train an autoencoder. The autoencoder takes an image and compresses it into latent space through a bottleneck. The compressed data can then be parsed through the decoder to be reconstructed. Things I'm working on here are going to help me in a neural codec project in the near future.
 
-## Datasets
+## Dataset
+The dataset was processed into unstructured [WebDataset](https://github.com/webdataset/webdataset) format without any labels.
 - [ILSVRC/imagenet-1k](https://huggingface.co/datasets/ILSVRC/imagenet-1k)
-- [Tagged Anime Illustrations](https://www.kaggle.com/datasets/mylesoneill/tagged-anime-illustrations)
 
 ## Getting Started
 Create conda environment

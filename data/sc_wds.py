@@ -28,41 +28,12 @@ class Imagenet_1K(SCWDS):
         return glob(os.path.join(path, f"*-{split}-*.tar")), cls.SPLIT_LENGTHS[split]
 
 
-class TaggedAnimeIllustrations(SCWDS):
-    SPLIT_LENGTHS = {
-        "train": 317435,
-        "val": 34000
-    }
-
-    @classmethod
-    def get_paths(cls, path, split="train"):
-        shards = glob(os.path.join(path, "*.tar"))
-        shard_length = len(shards)
-        val_ratio = 0.1
-        val_length = int(shard_length * val_ratio)
-        train_length = shard_length - val_length
-
-        if split == "train":
-            return shards[:train_length], cls.SPLIT_LENGTHS[split]
-        elif split == "val":
-            return shards[-val_length:], cls.SPLIT_LENGTHS[split]
-        else:
-            raise Exception("Invalid split")
-        
-
 DATASETS = {
     "imagenet-1k": {
         "object":Imagenet_1K,
         "splits": [
             "train",
             "test",
-            "val"
-        ]
-    },
-    "tagged-anime-illustrations": {
-        "object": TaggedAnimeIllustrations,
-        "splits": [
-            "train",
             "val"
         ]
     }
@@ -117,34 +88,3 @@ class SCWebDatasets:
             lengths.append(data_length)
         
         return self.create_dataset_from_shards(shards, sum(lengths), shardshuffle)
-
-
-if __name__ == "__main__":
-    from transforms import SquareImageTransform
-    import argparse
-    import tqdm
-    from torch.utils.data import DataLoader
-
-    #p = argparse.ArgumentParser()
-
-    #p.add_argument("--path", type=str, default="/mnt/data/Vision/Unstructured/imagenet-1k/data")
-    #p.add_argument("--split", type=str, default=None)
-
-    #args = p.parse_args()
-
-    #length = SCWebDatasets.get_data_length(args.path, args.split)
-
-    # dataset = TaggedAnimeIllustrations.get_dataset("/mnt/data/Vision/Unstructured/tagged-anime-illustrations", "train")
-
-    # length = SCWebDatasets.get_data_length(dataset, None)
-    
-    # print(f"Got {length} columns for train split")
-
-    # dataset = TaggedAnimeIllustrations.get_dataset("/mnt/data/Vision/Unstructured/tagged-anime-illustrations", "val")
-
-    # length = SCWebDatasets.get_data_length(dataset, None)
-    
-    # print(f"Got {length} columns for val split")
-
-    length = SCWDS.get_length("/mnt/data/Vision/Unstructured/nsfw/data", "train")
-    print(f"Got Length {length}")
