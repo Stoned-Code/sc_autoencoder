@@ -15,6 +15,7 @@ def get_arguments():
     data.add_argument("--prefetch_factor", type=int, default=None)
     data.add_argument("--min_noise_sigma", type=float, default=0.01)
     data.add_argument("--datasets", nargs="+", default=["imagenet-1k"])
+    data.add_argument("--recon_amt", type=int, default=3)
 
     # Models
     models = p.add_argument_group("Both Models", description="Arguments that modify both models' behavour.")

@@ -17,6 +17,10 @@ Create conda environment
 ```
 conda create -p .conda python=3.12
 ```
+Activate environment
+```
+conda activate .conda/
+```
 Install requirements.
 ```
 python -m pip install -r requirements.txt

@@ -86,7 +86,7 @@ class Upscale2D(nn.Module):
         if hasattr(self, "attn"):
             x = self.attn(x)
 
-        if self.unet_style:
+        if self.unet_style and skip is not None:
             skip = torch.zeros_like(x) if skip is None else self.skip_dropout(skip)
 
             x = torch.cat([x, skip], dim=1)
@@ -112,7 +112,9 @@ class DynamicEncoder2D(nn.Module, ModuleTools):
         self.down_1 = nn.Sequential(Downscale2D(channels, 16,use_attn=False), nn.LeakyReLU(0.01, True))
         self.down_2 = nn.Sequential(Downscale2D(16, 32, use_attn=False), nn.LeakyReLU(0.01, True))
         self.down_3 = nn.Sequential(Downscale2D(32, 64, use_attn=False), nn.LeakyReLU(0.01, True))
-        self.down_4 = Downscale2D(64, 128, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet)
+        self.down_4 = nn.Sequential(Downscale2D(64, 128, use_attn=False), nn.LeakyReLU(0.01, True))
+        self.down_5 = nn.Sequential(Downscale2D(128, 256, use_attn=False), nn.LeakyReLU(0.01, True))
+        self.down_6 = Downscale2D(256, 512, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet)
 
         self.unet_style=unet_style
 
@@ -128,25 +130,35 @@ class DynamicEncoder2D(nn.Module, ModuleTools):
             self.logvar = nn.Linear(hidden_size, latent_dims) if not use_attn else MultiHeadAttention(hidden_size, latent_dims, num_heads) #if not use_bitnet else BitLinear(hidden_size, latent_dims)#MultiHeadAttention(hidden_size, latent_dims, num_heads, use_bitnet) #nn.Linear(hidden_size, latent_dims) if not use_bitnet else BitLinear(hidden_size, latent_dims)
         self.down_shape = ()
     
-    def forward(self, x):
-        if self.unet_style:
+    def forward(self, x, return_skips=True):
+        if self.unet_style and return_skips:
             skips = []
         x = self.down_1(x)
         
-        if self.unet_style:
+        if self.unet_style and return_skips:
             skips.append(x)
 
         x = self.down_2(x)
         
-        if self.unet_style:
+        if self.unet_style and return_skips:
             skips.append(x)
 
         x = self.down_3(x)
         
-        if self.unet_style:
+        if self.unet_style and return_skips:
             skips.append(x)
 
         x = self.down_4(x)
+
+        if self.unet_style and return_skips:
+            skips.append(x)
+
+        x = self.down_5(x)
+
+        if self.unet_style and return_skips:
+            skips.append(x)
+
+        x = self.down_6(x)
 
         if hasattr(self, "attn"):
             x = self.attn(x)
@@ -158,10 +170,11 @@ class DynamicEncoder2D(nn.Module, ModuleTools):
             x = self.flatten(x)
         
         try:
-            if self.unet_style:
+            if self.unet_style and return_skips:
                 return self.mu(x), self.logvar(x), skips
-            
+                
             return self.mu(x), self.logvar(x)
+        
         except Exception as ex:
             print("Try hidden_size:", x.shape[-1])
             raise ex
@@ -184,15 +197,13 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
             "use_bitnet": use_bitnet,
             "num_heads": num_heads
         }
-        self.up_1 = nn.Sequential(Upscale2D(128, 64, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet), nn.LeakyReLU(0.01))
-        self.up_2 = nn.Sequential(Upscale2D(64, 32, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
-        self.up_3 = nn.Sequential(Upscale2D(32, 16, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
-        self.up_4 = nn.Sequential(Upscale2D(16, channels, use_attn=False))
+        self.up_1 = nn.Sequential(Upscale2D(512, 256, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet, output_padding=0), nn.LeakyReLU(0.01))
+        self.up_2 = nn.Sequential(Upscale2D(256, 128, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
+        self.up_3 = nn.Sequential(Upscale2D(128, 64, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
+        self.up_4 = nn.Sequential(Upscale2D(64, 32, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
+        self.up_5 = nn.Sequential(Upscale2D(32, 16, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
+        self.up_6 = nn.Sequential(Upscale2D(16, channels, use_attn=False))
 
-        # self.encoder_transformer = nn.Sequential(
-        #     WindowedTransformerLayer(dim=128, heads=num_heads, window_size=128, use_bitnet=use_bitnet),
-        #     WindowedTransformerLayer(dim=128, heads=num_heads, window_size=128, use_bitnet=use_bitnet)
-        # )
         if conv_bottleneck:
             self.bottleneck = nn.ConvTranspose2d(conv_bottleneck, 128, 3)#, SpatialAttention(128, num_heads))
             self.attn = SpatialAttention(128, num_heads, use_bitnet=False)
@@ -216,7 +227,9 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
         x = self.up_1((x, None if skips is None else skips[0]))
         x = self.up_2((x, None if skips is None else skips[1]))
         x = self.up_3((x, None if skips is None else skips[2]))
-        x = self.up_4(x)
+        x = self.up_4((x, None if skips is None else skips[3]))
+        x = self.up_5((x, None if skips is None else skips[4]))
+        x = self.up_6(x)
 
         return x
 
@@ -263,28 +276,24 @@ class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
         
         return super().to(*args, **kwargs)
 
-    def forward(self, x, y=None, t=None, sigma=5.0):
-        if not self.unet_style:
-            mu, logvar = self.encoder(x)
-            skips = None
-        else:
-            mu, logvar, skips = self.encoder(x)
+    def forward(self, x, y=None, t=None, sigma=5.0, use_skips=False):
+        if self.unet_style and use_skips:
+            mu, logvar, skips = self.encoder(x, use_skips)
         
+        else:
+            mu, logvar = self.encoder(x, False)
+            skips = None
 
         z = self.reparameterize(mu, logvar)
-        # print(mu.shape)
-        # z = z.flatten(2)
-        # print(z.shape)
 
         if hasattr(self, "rvq"):
             z, indices, commit_loss = self.rvq(z)
         else:
             indices, commit_loss = None, None
 
-        # print(z.shape)
         try:
-            
             recon = self.decoder(z, skips)
+
         except Exception as ex:
             print("Try Unflatten Shape:", self.encoder.down_shape)
             raise ex

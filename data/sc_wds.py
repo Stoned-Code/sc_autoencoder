@@ -28,64 +28,13 @@ class Imagenet_1K(SCWDS):
     def get_paths(cls, path, split="train"):
         return glob(os.path.join(path, f"*-{split}-*.tar")), cls.SPLIT_LENGTHS[split]
 
-
-DATASETS = {
-    "imagenet-1k": {
-        "object":Imagenet_1K,
-        "splits": [
-            "train",
-            "test",
-            "val"
-        ]
-    }
-}
-
-class SCWebDatasets:
-    def __init__(self, root):
-        self.root = root
-    
-    @staticmethod
-    def get_data_length(path, split):
-        if isinstance(path, list):
-            if split is not None:
-                shards = glob(os.path.join(path, f"*-{split}-*.tar"))
-            else:
-                shards = glob(os.path.join(path, "*.tar"))
-            dataset = wds.WebDataset(shards)
-            length = 0
-
-            for _ in tqdm(dataset, desc="Getting Dataset Length"):
-                length += 1
-
-            return length
-        else:
-            length = 0
-            for _ in tqdm(path, desc="Getting Dataset Length"):
-                length += 1
-
-            return length
-
-    def create_dataset_from_shards(cls, shards, length, shardshuffle=True):
-        dataset = wds.WebDataset(shards, shardshuffle=shardshuffle)
-
-        return dataset.to_tuple("img").with_length(length)
-
-    def get_datasets(self, datasets: list, split="train", shardshuffle=True):
-
-        shards = []
-        lengths = []
+    @classmethod
+    def get_from_hf(cls, split="train", shardshuffle=1):
+        if split == "test":
+            shard = "https://huggingface.co/datasets/Stoned-Code/imagenet-1k_wds/resolve/main/data/imagenet-1k-test-{000000..000999}.tar"
+        elif split == "val":
+            shard = "https://huggingface.co/datasets/Stoned-Code/imagenet-1k_wds/resolve/main/data/imagenet-1k-val-{000000..000499}.tar"
+        elif split == "train":
+            shard = "https://huggingface.co/datasets/Stoned-Code/imagenet-1k_wds/resolve/main/data/imagenet-1k-train-{000000..000640}.tar"
         
-        for dataset in datasets:
-            if dataset not in DATASETS:
-                raise Exception(f"Dataset {dataset} does not exist...")
-
-            dataset_obj = DATASETS[dataset]
-
-            if split not in dataset_obj["splits"]:
-                raise Exception(f"{dataset} doesn't have a {split} split...")
-            
-            data_shards, data_length = dataset_obj["object"].get_paths(os.path.join(self.root, dataset, "data"), split)
-            shards.extend(data_shards)
-            lengths.append(data_length)
-        
-        return self.create_dataset_from_shards(shards, sum(lengths), shardshuffle)
+        return wds.WebDataset(shard, shardshuffle=shardshuffle).with_length(cls.SPLIT_LENGTHS[split])

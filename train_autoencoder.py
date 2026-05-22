@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from modules.dynamic_ae import DynamicAutoencoder2D
 from modules.discriminator import PatchGAN
-from data.sc_wds import SCWebDatasets
+from data.sc_wds import Imagenet_1K
 from data.transforms import SquareImageTransform
 import torch.optim as optim
 import torch
@@ -138,16 +138,14 @@ def train(args):
     learning_rate = args.learning_rate 
     weight_decay = args.weight_decay
 
-    # Create the SC_ASMR object to grab the ASMR data from.
-    asmr = SCWebDatasets(args.dataset_path)
 
     square_method = args.square_method.upper()
     # Create a data transform object
     train_data_transform = SquareImageTransform(args.side_length, eval(f"SquareMethod.{square_method}"), denoise=args.denoise, TS=args.max_timestep)
     val_data_transform = SquareImageTransform(args.side_length, eval(f"SquareMethod.{square_method}"), denoise=args.denoise, TS=args.max_timestep, random_tile=False)
     # Create dataset splits.
-    train_ds = asmr.get_datasets(args.datasets, "train").map(train_data_transform)
-    val_ds = asmr.get_datasets(args.datasets, "val", False).map(val_data_transform)
+    train_ds = Imagenet_1K.get_from_hf("train").map(train_data_transform)
+    val_ds = Imagenet_1K.get_from_hf("val", False).map(val_data_transform)
 
     # Print the split lengths.
     print("Training Samples:", len(train_ds))
@@ -230,7 +228,7 @@ def train(args):
                     tb = None
                 
                 # Do a forward pass with 'xb', 'yb' and 'tb' as inputs.
-                _, recon, _, ae_losses = g_model(xb, yb, tb)
+                _, recon, _, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
 
                 # Train Discriminator
                 d_optimizer.zero_grad(set_to_none=True)
@@ -297,7 +295,7 @@ def train(args):
                         tb = None
 
                     # Do a forward pass using 'xb', 'yb', tb'
-                    _, recon, indices, ae_losses = g_model(xb, yb, tb)
+                    _, recon, indices, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
 
                     # Do a forward pass to get the logits for generated data.
                     fake_logits = d_model(recon)
@@ -336,8 +334,13 @@ def train(args):
                 log_codebook_usage(indices, args.codebook_size)
 
             # Reconstruct an audio file then save it for listening.
-            save_reconstructions(xb[-3:], recon[-3:], yb[-3:], filename=f"reconstruction_{e:06d}.jpg")
-            save_reconstructions(xb[-3:], recon[-3:], yb[-3:], output_dir="./")
+            if args.recon_amt < 0:
+                save_reconstructions(xb[args.recon_amt:], recon[args.recon_amt:], yb[args.recon_amt:], filename=f"reconstruction_{e:06d}.jpg")
+                save_reconstructions(xb[args.recon_amt:], recon[args.recon_amt:], yb[args.recon_amt:], output_dir="./")
+
+            elif args.recon_amt > 0:
+                save_reconstructions(xb[:args.recon_amt], recon[:args.recon_amt], yb[:args.recon_amt], filename=f"reconstruction_{e:06d}.jpg")
+                save_reconstructions(xb[:args.recon_amt], recon[:args.recon_amt], yb[:args.recon_amt], output_dir="./")
 
             # Using the set patience_loss as the key, check if the model has improved.
             if val_losses[patience_loss] < lowest_loss:
@@ -371,7 +374,7 @@ if __name__ == "__main__":
     # Grab arguments for training
     args = get_arguments()
 
-    accelerator = Accelerator(gradient_accumulation_steps=4, mixed_precision="bf16", log_with="tensorboard")
+    accelerator = Accelerator(gradient_accumulation_steps=4, mixed_precision="bf16")
 
     df = train(args)
     
