@@ -70,12 +70,15 @@ class Upscale2D(nn.Module):
         if use_attn:
             self.attn = SpatialAttention(dim=out_channels, heads=num_heads, use_bitnet=use_bitnet)
         
-        self.unet_style = unet_style
+        # self.unet_style = unet_style
         if unet_style:
             self.leaky_relu = nn.LeakyReLU(0.01)
-            self.conv = nn.Conv2d(out_channels * 2, out_channels, 3, 1, 1, bias=bias)
-            self.batch_norm_conv = nn.BatchNorm2d(out_channels)
             self.skip_dropout = nn.Dropout2d(unet_dropout)
+            self.unet = nn.Sequential(
+                nn.Conv2d(out_channels * 2, out_channels, 3, 1, 1, bias=bias),
+                nn.BatchNorm2d(out_channels)
+            )
+
     
     def forward(self, x, skip=None):
         if isinstance(x, tuple):
@@ -86,16 +89,18 @@ class Upscale2D(nn.Module):
         if hasattr(self, "attn"):
             x = self.attn(x)
 
-        if self.unet_style and skip is not None:
+        if hasattr(self, "unet") and skip is not None:
+            x = self.leaky_relu(x)
+
             skip = torch.zeros_like(x) if skip is None else self.skip_dropout(skip)
 
             x = torch.cat([x, skip], dim=1)
-            x = self.conv(x)
-            x = self.batch_norm_conv(x)
+            x = self.unet(x)
+            # x = self.conv(x)
+            # x = self.batch_norm_conv(x)
         
         return x
-
-
+        
 class DynamicEncoder2D(nn.Module, ModuleTools):
     def __init__(self, latent_dims, channels=3, hidden_size=6256, use_attn=True, unet_style=False, num_heads=4, conv_bottleneck=None, use_bitnet=True):
         super().__init__()
@@ -119,10 +124,10 @@ class DynamicEncoder2D(nn.Module, ModuleTools):
         self.unet_style=unet_style
 
         if conv_bottleneck:
-            self.attn = SpatialAttention(128, num_heads, use_bitnet=False)
+            self.attn = SpatialAttention(512, num_heads, use_bitnet=False)
 
-            self.mu = nn.Conv2d(128, conv_bottleneck, 3)
-            self.logvar = nn.Conv2d(128, conv_bottleneck, 3)
+            self.mu = nn.Conv2d(512, conv_bottleneck, 3)
+            self.logvar = nn.Conv2d(512, conv_bottleneck, 3)
 
         else:
             self.flatten = nn.Flatten(1)
@@ -197,7 +202,7 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
             "use_bitnet": use_bitnet,
             "num_heads": num_heads
         }
-        self.up_1 = nn.Sequential(Upscale2D(512, 256, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet, output_padding=0), nn.LeakyReLU(0.01))
+        self.up_1 = nn.Sequential(Upscale2D(512, 256, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=use_attn, num_heads=num_heads, use_bitnet=use_bitnet, out_padding=0), nn.LeakyReLU(0.01))
         self.up_2 = nn.Sequential(Upscale2D(256, 128, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
         self.up_3 = nn.Sequential(Upscale2D(128, 64, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
         self.up_4 = nn.Sequential(Upscale2D(64, 32, use_batchnorm=True, unet_style=unet_style, unet_dropout=skip_dropout, use_attn=False), nn.LeakyReLU(0.01))
@@ -205,8 +210,8 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
         self.up_6 = nn.Sequential(Upscale2D(16, channels, use_attn=False))
 
         if conv_bottleneck:
-            self.bottleneck = nn.ConvTranspose2d(conv_bottleneck, 128, 3)#, SpatialAttention(128, num_heads))
-            self.attn = SpatialAttention(128, num_heads, use_bitnet=False)
+            self.bottleneck = nn.ConvTranspose2d(conv_bottleneck, 512, 3)#, SpatialAttention(128, num_heads))
+            self.attn = SpatialAttention(512, num_heads, use_bitnet=False)
             
         else:
             self.bottleneck = nn.Sequential(nn.Unflatten(1, unflatten_shape)
@@ -233,6 +238,8 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
 
         return x
 
+    # def freeze_unet_layers(self):
+        
 
 class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
     def __init__(self, latent_dims, channels, hidden_size=6256, unflatten_shape=(16, 391), num_quantizers=8, codebook_size=512, 
@@ -329,6 +336,16 @@ class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
 
         return z, recon, indices, None
 
+    def freeze_all_unet_layers(self):
+        frozen = 0
+        for module in self.modules():           # This walks through every submodule
+            if isinstance(module, Upscale2D) and hasattr(module, "unet"):
+                for param in module.unet.parameters():
+                    param.requires_grad = False
+                    frozen += 1
+                # Optional: put in eval mode too
+                # module.unet.eval()
+        print(f"Froze {frozen} layers.")
 
 if __name__ == "__main__":
     rand = torch.randn((2, 3, 128, 128))

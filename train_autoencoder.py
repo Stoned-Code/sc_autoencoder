@@ -124,13 +124,16 @@ def train(args):
         g_model = DynamicAutoencoder2D(args.latent_dims, args.channels, args.g_hidden_size, args.unflatten_shape, args.num_quantizers, 
                                 args.codebook_size, args.no_attn, args.no_bitnet, args.unet_style, args.skip_dropout, args.num_heads, args.conv_bottleneck)
 
+    if g_model.unet_style and not args.unet_style:
+        g_model.freeze_all_unet_layers()
+
     g_model.print_parameters()
 
     # Load the Discriminative model if it exists.
     if os.path.exists(d_model_path):
         d_model = PatchGAN.load_checkpoint(d_model_path)
     else:
-        d_model = PatchGAN(args.channels, args.d_start_dims, args.d_depth, args.d_kernel_size, args.d_padding, args.d_leaky_relu_slope)
+        d_model = PatchGAN(args.channels, args.d_start_dim, args.d_depth, args.d_kernel_size, args.d_padding, args.d_leaky_relu_slope)
 
     d_model.print_parameters()
 
@@ -143,10 +146,14 @@ def train(args):
     # Create a data transform object
     train_data_transform = SquareImageTransform(args.side_length, eval(f"SquareMethod.{square_method}"), denoise=args.denoise, TS=args.max_timestep)
     val_data_transform = SquareImageTransform(args.side_length, eval(f"SquareMethod.{square_method}"), denoise=args.denoise, TS=args.max_timestep, random_tile=False)
+    
     # Create dataset splits.
-    train_ds = Imagenet_1K.get_from_hf("train").map(train_data_transform)
-    val_ds = Imagenet_1K.get_from_hf("val", False).map(val_data_transform)
-
+    if args.dataset_path is None:
+        train_ds = Imagenet_1K.get_from_hf("train").map(train_data_transform)
+        val_ds = Imagenet_1K.get_from_hf("val", False).map(val_data_transform)
+    else:
+        train_ds = Imagenet_1K.get_dataset(args.dataset_path, "train").map(train_data_transform)
+        val_ds = Imagenet_1K.get_dataset(args.datsaet_path, "val").map(val_data_transform)
     # Print the split lengths.
     print("Training Samples:", len(train_ds))
     print("Validation Samples:", len(val_ds))

@@ -37,4 +37,4 @@ class Imagenet_1K(SCWDS):
         elif split == "train":
             shard = "https://huggingface.co/datasets/Stoned-Code/imagenet-1k_wds/resolve/main/data/imagenet-1k-train-{000000..000640}.tar"
         
-        return wds.WebDataset(shard, shardshuffle=shardshuffle).with_length(cls.SPLIT_LENGTHS[split])
+        return wds.WebDataset(shard, shardshuffle=shardshuffle).to_tuple("img").with_length(cls.SPLIT_LENGTHS[split])

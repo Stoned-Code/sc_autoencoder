@@ -7,7 +7,7 @@ def get_arguments():
     data = p.add_argument_group("Data", description="Arguments that changes how the data is handled.")
     data.add_argument("--side_length", type=int, default=224)
     data.add_argument("--denoise", action="store_true")
-    data.add_argument("--dataset_path", type=str, default="/mnt/data/Vision/Unstructured")
+    data.add_argument("--dataset_path", type=str, default=None)
     data.add_argument("--square_method", type=str, default="CROP")
     data.add_argument("--max_timestep", type=int, default=1000)
     data.add_argument("--train_workers", type=int, default=0)
