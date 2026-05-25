@@ -14,7 +14,6 @@ def get_arguments():
     data.add_argument("--val_workers", type=int, default=0)
     data.add_argument("--prefetch_factor", type=int, default=None)
     data.add_argument("--min_noise_sigma", type=float, default=0.01)
-    data.add_argument("--datasets", nargs="+", default=["imagenet-1k"])
     data.add_argument("--recon_amt", type=int, default=3)
 
     # Models
@@ -36,7 +35,7 @@ def get_arguments():
     gen.add_argument("--codebook_size", type=int, default=1024)
     gen.add_argument("--num_heads", type=int, default=4)
     gen.add_argument("--unflatten_shape", nargs="+", type=tuple, default=(128, 14, 14))
-    gen.add_argument("--skip_dropout", type=float, default=0.2)
+    gen.add_argument("--skip_dropout", type=float, default=0.0)
 
     # Discriminative
     disc = p.add_argument_group("Discriminative Model", description="Arguments that modify how the discriminative model behaves.")
@@ -63,7 +62,7 @@ def get_arguments():
     loss_weights.add_argument("--commit_loss_weight", type=float, default=0.05)
     loss_weights.add_argument("--noise_loss_weight", type=float, default=0.25)
     loss_weights.add_argument("--kl_loss_weight", type=float, default=1e-5)
-    loss_weights.add_argument("--mmd_loss_weight", type=float, default=1.1)
+    # loss_weights.add_argument("--mmd_loss_weight", type=float, default=1.1)
     loss_weights.add_argument("--adv_loss_weight", type=float, default=0.5)
 
     args = p.parse_args()

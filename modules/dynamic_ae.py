@@ -17,25 +17,25 @@ def mmd_vae_loss(recon_x, x, z, mu, logvar, sigma=5.0):
     kl_per_img = -0.5 * torch.sum(kl, dim=-1)
     kl_loss = torch.mean(kl_per_img)
 
-    # Sample prior
-    prior_z = torch.randn_like(z)
+    # # Sample prior
+    # prior_z = torch.randn_like(z)
 
-    # Compute pairwise distances
-    def compute_kernel(x, y):
-        x_size, y_size = x.size(0), y.size(0)
-        dim = x.size(1)
-        x = x.unsqueeze(1)  # (x_size, 1, dim)
-        y = y.unsqueeze(0)  # (1, y_size, dim)
-        tiled_diff = (x - y).pow(2).mean(2) / (2 * sigma ** 2)
-        return torch.exp(-tiled_diff + 1e-8)
+    # # Compute pairwise distances
+    # def compute_kernel(x, y):
+    #     x_size, y_size = x.size(0), y.size(0)
+    #     dim = x.size(1)
+    #     x = x.unsqueeze(1)  # (x_size, 1, dim)
+    #     y = y.unsqueeze(0)  # (1, y_size, dim)
+    #     tiled_diff = (x - y).pow(2).mean(2) / (2 * sigma ** 2)
+    #     return torch.exp(-tiled_diff + 1e-8)
 
-    # MMD loss
-    xx = compute_kernel(z, z)
-    yy = compute_kernel(prior_z, prior_z)
-    xy = compute_kernel(z, prior_z)
-    mmd_loss = xx.mean() + yy.mean() - 2 * xy.mean()
+    # # MMD loss
+    # xx = compute_kernel(z, z)
+    # yy = compute_kernel(prior_z, prior_z)
+    # xy = compute_kernel(z, prior_z)
+    # mmd_loss = xx.mean() + yy.mean() - 2 * xy.mean()
 
-    return recon_loss, mmd_loss, kl_loss
+    return recon_loss, kl_loss
 
 
 class SquaredReLU(nn.Module):
@@ -243,7 +243,7 @@ class DynamicDecoder2D(nn.Module, ModuleTools):
 
 class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
     def __init__(self, latent_dims, channels, hidden_size=6256, unflatten_shape=(16, 391), num_quantizers=8, codebook_size=512, 
-                 use_attn=True, use_bitnet=True, unet_style=False, skip_dropout=0.2, num_heads=4, conv_bottleneck=None):
+                 use_attn=True, use_bitnet=True, unet_style=False, skip_dropout=0.0, num_heads=4, conv_bottleneck=None):
         super().__init__()
 
         self.config = {
@@ -308,21 +308,21 @@ class DynamicAutoencoder2D(nn.Module, ModuleTools, Reparameterizer):
             noise_pred = self.noise_pred(z)
 
         if y is not None:
-            recon_loss, mmd_loss, kl_loss = mmd_vae_loss(recon, y, z, mu, logvar, sigma)#mmd_vae_loss(recon, y, z, sigma)
+            recon_loss, kl_loss = mmd_vae_loss(recon, y, z, mu, logvar, sigma)#mmd_vae_loss(recon, y, z, sigma)
             # stft_loss = multi_scale_stft_loss(recon, y)
             if commit_loss is not None:
                 losses = {
                     "recon_loss": recon_loss,
                     "kl_loss": kl_loss,
                     "commit_loss": commit_loss.mean(),
-                    "mmd_loss": mmd_loss
+                    # "mmd_loss": mmd_loss
                     # "stft_loss": stft_loss
                 }
             else:
                 losses = {
                     "recon_loss": recon_loss,
                     "kl_loss": kl_loss,
-                    "mmd_loss": mmd_loss
+                    # "mmd_loss": mmd_loss
                 }
             if t is not None:
                 print(noise_pred.shape)

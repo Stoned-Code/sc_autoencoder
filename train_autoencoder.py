@@ -78,13 +78,13 @@ def create_gif(images_path, output_dir="./reconstructions", filename="reconstruc
         [os.remove(p) for p in paths]
 
 
-def create_loss_weights(recon_loss, commit_loss, noise_loss, kl_loss, adv_loss, mmd_loss):
+def create_loss_weights(recon_loss, commit_loss, noise_loss, kl_loss, adv_loss):
     return {
         "recon_loss": recon_loss,
         "commit_loss": commit_loss,
         "noise_loss": noise_loss,
         "kl_loss": kl_loss,
-        "mmd_loss": mmd_loss,
+        # "mmd_loss": mmd_loss,
         "adv_loss": adv_loss
     }
 
@@ -153,7 +153,7 @@ def train(args):
         val_ds = Imagenet_1K.get_from_hf("val", False).map(val_data_transform)
     else:
         train_ds = Imagenet_1K.get_dataset(args.dataset_path, "train").map(train_data_transform)
-        val_ds = Imagenet_1K.get_dataset(args.datsaet_path, "val").map(val_data_transform)
+        val_ds = Imagenet_1K.get_dataset(args.dataset_path, "val").map(val_data_transform)
     # Print the split lengths.
     print("Training Samples:", len(train_ds))
     print("Validation Samples:", len(val_ds))
@@ -187,7 +187,7 @@ def train(args):
     accelerator.print("Training for {} iterations".format(total_training_iterations))
 
     # Create the loss weights for the training losses.
-    loss_weights = create_loss_weights(args.recon_loss_weight, args.commit_loss_weight, args.noise_loss_weight, args.kl_loss_weight, args.adv_loss_weight, args.mmd_loss_weight)
+    loss_weights = create_loss_weights(args.recon_loss_weight, args.commit_loss_weight, args.noise_loss_weight, args.kl_loss_weight, args.adv_loss_weight)
 
     # Set epochs.
     epochs = args.epochs
@@ -369,7 +369,7 @@ def train(args):
             print("Stopping Training...")
             break
     
-    create_gif("./reconstructions", delete_iamges=True)
+    create_gif("./reconstructions", delete_images=True)
 
     # Empty cuda cache if it's available.
     if torch.cuda.is_available() and device == "cuda":
