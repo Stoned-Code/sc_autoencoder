@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-from modules.dynamic_ae import DynamicAutoencoder2D
+from modules.dynamic_ae import ImageAE
 from modules.discriminator import PatchGAN
 from data.sc_wds import Imagenet_1K
 from data.transforms import SquareImageTransform
@@ -17,6 +17,8 @@ from modules.scheduler import LRScheduler
 from data.transforms import SquareMethod
 from accelerate import Accelerator
 from training_arguments import get_arguments
+
+torch.backends.cudnn.enabled = False
 
 def lerp(a: float, b: float, t: float) -> float:
     """Linear interpolate on the scale given by a to b, using t as the point on that scale."""
@@ -119,10 +121,11 @@ def train(args):
 
     # Load Generative model if it exists.
     if os.path.exists(g_model_path):
-        g_model = DynamicAutoencoder2D.load_checkpoint(g_model_path)
+        g_model = ImageAE.load_checkpoint(g_model_path)
     else:
-        g_model = DynamicAutoencoder2D(args.latent_dims, args.channels, args.g_hidden_size, args.unflatten_shape, args.num_quantizers, 
-                                args.codebook_size, args.no_attn, args.no_bitnet, args.unet_style, args.skip_dropout, args.num_heads, args.conv_bottleneck)
+        g_model = ImageAE(args.channels, args.start_channels, args.g_depth, args.conv_bottleneck, 0.01, args.output_padding, args.unet_style, args.num_heads, args.no_bitnet)
+        # g_model = ImageAE(args.latent_dims, args.channels, args.g_hidden_size, args.unflatten_shape, args.num_quantizers, 
+        #                         args.codebook_size, args.no_attn, args.no_bitnet, args.unet_style, args.skip_dropout, args.num_heads, args.conv_bottleneck)
 
     if g_model.unet_style and not args.unet_style:
         g_model.freeze_all_unet_layers()
@@ -154,6 +157,7 @@ def train(args):
     else:
         train_ds = Imagenet_1K.get_dataset(args.dataset_path, "train").map(train_data_transform)
         val_ds = Imagenet_1K.get_dataset(args.dataset_path, "val").map(val_data_transform)
+        
     # Print the split lengths.
     print("Training Samples:", len(train_ds))
     print("Validation Samples:", len(val_ds))
@@ -192,10 +196,6 @@ def train(args):
     # Set epochs.
     epochs = args.epochs
 
-    # Set The discriminator and generator to training model
-    g_model.train()
-    d_model.train()
-
     # Sets the patience loss key
     patience_loss = args.patience_loss
 
@@ -213,6 +213,9 @@ def train(args):
     # Iterrate over epochs.
     for e in range(epochs):
         try:
+            # Set The discriminator and generator to training model
+            g_model.train()
+            d_model.train()
             if args.denoise:
                 noise_sigma = lerp(clamp(args.min_noise_sigma), 1.0, (e + 1) / epochs)
                 train_data_transform.set_ts_sigma(noise_sigma)
@@ -235,7 +238,7 @@ def train(args):
                     tb = None
                 
                 # Do a forward pass with 'xb', 'yb' and 'tb' as inputs.
-                _, recon, _, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
+                _, recon, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
 
                 # Train Discriminator
                 d_optimizer.zero_grad(set_to_none=True)
@@ -250,7 +253,7 @@ def train(args):
 
                 # Do the backward pass.
                 accelerator.backward(d_loss)
-                accelerator.clip_grad_norm_(d_model.parameters(), max_norm=1.0)
+                # accelerator.clip_grad_norm_(d_model.parameters(), max_norm=1.0)
 
                 d_optimizer.step()
                 d_scheduler.step()
@@ -269,7 +272,7 @@ def train(args):
 
                 # Use the total loss to run the backward pass.
                 accelerator.backward(total_loss)
-                accelerator.clip_grad_norm_(g_model.parameters(), max_norm=1.0)
+                # accelerator.clip_grad_norm_(g_model.parameters(), max_norm=1.0)
 
                 g_optimizer.step()
                 g_scheduler.step()
@@ -289,6 +292,10 @@ def train(args):
             val_losses = {
                 "total_loss": 0
             }
+            
+            # Set The discriminator and generator to training model
+            g_model.eval()
+            d_model.eval()
 
             # Iterrate over validation data using torch.no_grad() to avoid calculating gradients.
             with torch.no_grad():
@@ -302,7 +309,7 @@ def train(args):
                         tb = None
 
                     # Do a forward pass using 'xb', 'yb', tb'
-                    _, recon, indices, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
+                    _, recon, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
 
                     # Do a forward pass to get the logits for generated data.
                     fake_logits = d_model(recon)
@@ -337,8 +344,8 @@ def train(args):
             df.loc[len(df)] = data
 
             # Log the codebook usage using the most recent returned codebook indices.
-            if indices is not None:
-                log_codebook_usage(indices, args.codebook_size)
+            # if indices is not None:
+            #     log_codebook_usage(indices, args.codebook_size)
 
             # Reconstruct an audio file then save it for listening.
             if args.recon_amt < 0:

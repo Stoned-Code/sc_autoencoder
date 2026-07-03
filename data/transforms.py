@@ -6,7 +6,7 @@ import torch
 from PIL import Image, ImageOps
 import numpy as np
 from enum import Enum
-from processing.image_processing import set_shortest_length
+from sc_utils.processing.image_processing import set_shortest_length
 from io import BytesIO
 
 def is_solid_color_tensor(img: torch.Tensor) -> bool:

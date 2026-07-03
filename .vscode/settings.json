@@ -1,0 +1,6 @@
+{
+  "python.analysis.extraPaths": [
+    "/home/ushio/sc_utils"
+  ],
+  "python.defaultInterpreterPath": "/home/ushio/sc_autoencoder/.conda/bin/python"
+}

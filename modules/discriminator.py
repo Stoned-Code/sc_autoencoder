@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .tools import ModuleTools
+from sc_utils.nn import ModuleTools
     
 class PatchGAN(nn.Module, ModuleTools):
     def __init__(self, input_channels, start_dim=64, depth=3, kernel_size=4, padding=1, leaky_relu_slope=0.2):
