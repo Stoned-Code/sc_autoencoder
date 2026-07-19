@@ -58,15 +58,26 @@ def get_arguments():
     training.add_argument("--epochs", "-e", type=int, default=10)
     training.add_argument("--patience", type=int, default=10)
     training.add_argument("--patience_loss", type=str, default="val_recon_loss")
+    training.add_argument("--data_amt", type=str, choices=["full", "half", "quarter", "tenth", "hundredth"], default="full")
+    training.add_argument("--gradient_accumulation_steps", type=int, default=2)
 
     # Loss Weights
     loss_weights = p.add_argument_group("Loss Weights", description="A set of weights to decide how each loss type affects how much each loss affects the backpropogation.")
     loss_weights.add_argument("--recon_loss_weight", type=float, default=1.0)
     loss_weights.add_argument("--commit_loss_weight", type=float, default=0.05)
-    loss_weights.add_argument("--noise_loss_weight", type=float, default=0.25)
+    loss_weights.add_argument("--noise_loss_weight", type=float, default=0.2)
     loss_weights.add_argument("--kl_loss_weight", type=float, default=1e-5)
     # loss_weights.add_argument("--mmd_loss_weight", type=float, default=1.1)
-    loss_weights.add_argument("--adv_loss_weight", type=float, default=0.5)
+    loss_weights.add_argument("--adv_loss_weight", type=float, default=0.1)
+    loss_weights.add_argument("--lpips_loss_weight", type=float, default=0.2)
+    loss_weights.add_argument("--use_lpips", action="store_true")
+
+    # Host
+    host = p.add_argument_group("Host Arguments", description="A set of arguments for the gradio server.")
+    host.add_argument("--host", type=str, default=None)
+    host.add_argument("--port", type=int, default=7860)
+    host.add_argument("--y_lim", type=float, default=1.0)
+    host.add_argument("--update_interval", type=float, default=1.0)
 
     args = p.parse_args()
 

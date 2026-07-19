@@ -111,19 +111,20 @@ class SquareMethod(Enum):
 
 
 class PILSquareTransform:
-    def __init__(self, window, method, tile_size, random_tile=True):
+    def __init__(self, window, method, tile_size, random_tile=True, grayscale=False):
         #super(PILSquareTransform, self).__init__()
         self.window = window
         self.method = method
         self.random_tile = random_tile
+        self.grayscale = grayscale
         if method == SquareMethod.TILE:
             self.tiler = TileImageTensor(tile_size, random_tile)
             self.to_tensor = TT.PILToTensor()
             self.tile_size = tile_size
 
-    def __call__(self, img):
-  
-        img = img.convert("RGB")
+    def __call__(self, img: Image):
+        img = img.convert("RGB" if not self.grayscale else "L")
+
         w, h = img.size
 
         if self.method == SquareMethod.CROP:
@@ -240,11 +241,12 @@ class SquareImageTransform:
                 window=None,
                 denoise=False,
                 TS=1000,
-                random_tile=True):
+                random_tile=True,
+                grayscale=False):
 
 
         self.side_length = side_length
-        self.reshape = PILSquareTransform(window, square_method, side_length, random_tile)
+        self.reshape = PILSquareTransform(window, square_method, side_length, random_tile, grayscale)
         self.img_norm = ImageNormalize(bidirection)
         if square_method != SquareMethod.TILE:
             self.to_tensor = TT.PILToTensor()
@@ -311,3 +313,14 @@ class SquareImageTransform:
             return noisy, img, torch.tensor(t)
 
         return img, img, 0
+    
+
+class TorchResize:
+    def __init__(self, scale, mode="bilinear", align_corners=False):
+        self.scale = scale
+        self.mode = mode
+        self.align_corners = align_corners
+    
+    def __call__(self, x):
+        return F.interpolate(x, self.scale, mode=self.mode, align_corners=self.align_corners)
+    

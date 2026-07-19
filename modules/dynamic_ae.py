@@ -4,18 +4,21 @@ import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sc_utils.nn import ModuleTools, Reparameterizer
+# from sc_utils.nn import ModuleTools, Reparameterizer
+
 try:
-    
-    # from .tools import ModuleTools, Reparameterizer
     from .discriminator import PatchGAN
-    # from audio_ds.audio_datasets import RawAudio
     from .attention import SpatialAttention
+    from .tools import ModuleTools, Reparameterizer
 except:
-    from discriminator import PatchGAN
-    from attention import SpatialAttention
-
-
+    try:
+        from modules.discriminator import PatchGAN
+        from modules.attention import SpatialAttention
+        from modules.tools import ModuleTools, Reparameterizer
+    except:
+        from discriminator import PatchGAN
+        from attention import SpatialAttention
+        from tools import ModuleTools, Reparameterizer
 def mmd_vae_loss(recon_x, x, mu, logvar):
     recon_loss = F.mse_loss(recon_x.clamp(0.0, 1.0), x.clamp(0.0, 1.0), reduction='mean') #/ x.size(0)
     # Calculate KL Loss
@@ -102,7 +105,8 @@ class COEncoder(nn.Module, ModuleTools):
 
         logits = self.spatial_attention(logits)
         # print(logits.shape)
-        _ = skips.pop()
+        if skips is not None:
+            _ = skips.pop()
         return self.mu(logits), self.logvar(logits), skips
 
 class Upscale2d(nn.Module):
@@ -172,21 +176,9 @@ class CODecoder(nn.Module, ModuleTools):
 
         for i in range(depth - 1):
             self.transposes.append(Upscale2d(self.min_channels, self.min_channels // 2, 3, 2 if len(stride) == 0 else stride.pop(0), 1, 1 if len(out_padding) == 0 else out_padding.pop(0), leaky_relu_slope, use_unet, True))
-            # self.transposes.append(nn.Sequential(
-            #     nn.ConvTranspose2d(self.min_channels, self.min_channels // 2, 3, 2 if len(stride) == 0 else stride.pop(0), 1, 1 if len(out_padding) == 0 else out_padding.pop(0)),
-            #     nn.BatchNorm2d(self.min_channels // 2),
-            #     nn.LeakyReLU(leaky_relu_slope)))
-
-            # if use_unet: #and conv_count < 4:
-            #     self.convs.append(nn.Sequential(
-            #         nn.Conv2d(self.min_channels, self.min_channels // 2, 3, 1, 1),
-            #         nn.BatchNorm2d(self.min_channels // 2)))
-
-            #     conv_count += 1
 
             self.min_channels = self.min_channels // 2
-        # if hasattr(self, "convs"):
-        #     print(len(self.convs))
+
         self.transposes.append(Upscale2d(self.min_channels, color_channels, 3, 2 if len(stride) == 0 else stride.pop(0), 1, 1 if len(out_padding) == 0 else out_padding.pop(0), use_activation=False))      
         self.transposes = nn.Sequential(*self.transposes)
         # self.transposes.append(nn.ConvTranspose2d(self.min_channels, color_channels, 3, 2 if len(stride) == 0 else stride.pop(0), 1, 1 if len(out_padding) == 0 else out_padding.pop(0)))
@@ -246,7 +238,7 @@ class ImageAE(nn.Module, ModuleTools, Reparameterizer):
         stride = list(reversed([p + 1 for p in output_padding]))
         self.enc = COEncoder(color_channels, start_channels, depth, bottleneck, leaky_relu_slope, num_heads, use_bitnet, stride.copy(), list(reversed(output_padding.copy())))
         self.dec = CODecoder(color_channels, self.enc.max_channels, depth, bottleneck, output_padding, leaky_relu_slope, unet_style, num_heads, use_bitnet, list(reversed(stride.copy())))
-        self.noise_predictor = PatchGAN(bottleneck, start_channels, depth, 4)
+        self.noise_predictor = PatchGAN(bottleneck, start_channels, 2, 4)
 
     @property
     def unet_style(self):
@@ -294,8 +286,8 @@ class ImageAE(nn.Module, ModuleTools, Reparameterizer):
     def freeze_all_unet_layers(self):
         frozen = 0
         for module in self.modules():           # This walks through every submodule
-            if isinstance(module, CODecoder) and hasattr(module, "convs"):
-                for param in module.convs.parameters():
+            if isinstance(module, Upscale2d) and hasattr(module, "conv"):
+                for param in module.conv.parameters():
                     param.requires_grad = False
                     frozen += 1
                 # Optional: put in eval mode too
@@ -330,24 +322,39 @@ def get_padding(required_shape, depth, bottleneck, start_channels, stride, paddi
     return attempt
 
 
+# if __name__ == "__main__":
+#     scale = 512
+#     x = torch.randn((2, 3, 512, 224))
+#     start_channels = 8
+#     depth = 6
+#     bottleneck = 16
+
+#     paddings = [1, 1, 1, 1, 0, 0]
+
+#     model = ImageAE(3, start_channels, depth, bottleneck, 0.01, paddings, True)
+
+#     z, recon, _ = model(x, use_skips=True)
+
+#     print("Input:", x.shape)
+#     print("Latent:", z.shape)
+#     print("Recon:", recon.shape)
+
+#     z = torch.randn((2, 16, 2, 2))
+
+#     recon = model.decode(z)
+#     print(recon.shape)
+
 if __name__ == "__main__":
-    scale = 512
-    x = torch.randn((2, 3, 512, 224))
-    start_channels = 8
-    depth = 6
-    bottleneck = 16
-
-    paddings = [1, 1, 1, 1, 0, 0]
-
-    model = ImageAE(3, start_channels, depth, bottleneck, 0.01, paddings, True)
-
-    z, recon, _ = model(x, use_skips=True)
-
-    print("Input:", x.shape)
-    print("Latent:", z.shape)
-    print("Recon:", recon.shape)
-
-    z = torch.randn((2, 16, 2, 2))
-
-    recon = model.decode(z)
-    print(recon.shape)
+    import lpips
+    loss_fn_alex = lpips.LPIPS(net="alex")
+    img_0 = torch.randn((3, 3, 224, 224))
+    img_1 = torch.randn((3, 3, 224, 224))
+    img_0 = (img_0 - 0.5) * 2
+    img_1 = (img_1 - 0.5) * 2
+    loss = loss_fn_alex(img_0, img_1).mean()
+    print(loss.shape)
+    print(loss)
+    print(img_0.shape)
+    resized = F.interpolate(img_0, size=(64, 64), mode="bilinear", align_corners=False)
+    # resized = val.resize(3, 3, 64, 64)
+    print(resized.shape)

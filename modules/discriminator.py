@@ -1,8 +1,15 @@
 import torch
 import torch.nn as nn
 
-from sc_utils.nn import ModuleTools
-    
+# from sc_utils.nn import ModuleTools
+try:
+    from modules.tools import ModuleTools
+except:
+    try:
+        from .tools import ModuleTools
+    except:
+        from tools import ModuleTools
+
 class PatchGAN(nn.Module, ModuleTools):
     def __init__(self, input_channels, start_dim=64, depth=3, kernel_size=4, padding=1, leaky_relu_slope=0.2):
         super().__init__()
@@ -42,8 +49,11 @@ class PatchGAN(nn.Module, ModuleTools):
     
 
     def forward(self, input):
-        return self.model(input)
-    
+        try:
+            return self.model(input)
+        except Exception as ex:
+            print("Input Shape:", input.shape)
+            raise ex
 
 def init_weights(module):
     if isinstance(module, nn.Conv2d):

@@ -11,12 +11,13 @@ import torch.optim as optim
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import argparse
 from PIL import Image
 from modules.scheduler import LRScheduler
-from data.transforms import SquareMethod
+from modules.loss import LPIPSLoss
+from data.transforms import SquareMethod, TorchResize
 from accelerate import Accelerator
 from training_arguments import get_arguments
+
 
 torch.backends.cudnn.enabled = False
 
@@ -70,7 +71,11 @@ def save_reconstructions(originals, recons, expected=None, output_dir = "./recon
 def create_gif(images_path, output_dir="./reconstructions", filename="reconstruciont_progression.gif", duration=100, delete_images=False):
     os.makedirs(output_dir, exist_ok=True)
 
-    paths = [ p for p in os.listdir(images_path) if p.endswith(".jpg")]
+    paths = [ os.path.join(images_path, p) for p in os.listdir(images_path) if p.endswith(".jpg")]
+
+    if len(paths) == 0:
+        return 
+
     paths = sorted(paths)
     images = [Image.open(p) for p in paths]
 
@@ -80,14 +85,15 @@ def create_gif(images_path, output_dir="./reconstructions", filename="reconstruc
         [os.remove(p) for p in paths]
 
 
-def create_loss_weights(recon_loss, commit_loss, noise_loss, kl_loss, adv_loss):
+def create_loss_weights(recon_loss, commit_loss, noise_loss, kl_loss, adv_loss, lpips_loss):
     return {
         "recon_loss": recon_loss,
         "commit_loss": commit_loss,
         "noise_loss": noise_loss,
         "kl_loss": kl_loss,
         # "mmd_loss": mmd_loss,
-        "adv_loss": adv_loss
+        "adv_loss": adv_loss,
+        "lpips_loss": lpips_loss
     }
 
 
@@ -118,7 +124,12 @@ def train(args):
     # Set the discriminative and generative model paths to be loaded if they exist.
     g_model_path = args.input_g_model
     d_model_path = args.input_d_model
+    if args.use_lpips:
+        resize = TorchResize((64, 64))
 
+        lpips = LPIPSLoss()
+        lpips.to(device)
+    
     # Load Generative model if it exists.
     if os.path.exists(g_model_path):
         g_model = ImageAE.load_checkpoint(g_model_path)
@@ -191,7 +202,7 @@ def train(args):
     accelerator.print("Training for {} iterations".format(total_training_iterations))
 
     # Create the loss weights for the training losses.
-    loss_weights = create_loss_weights(args.recon_loss_weight, args.commit_loss_weight, args.noise_loss_weight, args.kl_loss_weight, args.adv_loss_weight)
+    loss_weights = create_loss_weights(args.recon_loss_weight, args.commit_loss_weight, args.noise_loss_weight, args.kl_loss_weight, args.adv_loss_weight, args.lpips_loss_weight)
 
     # Set epochs.
     epochs = args.epochs
@@ -266,6 +277,10 @@ def train(args):
 
                 # Compute the loss for the fake data.
                 ae_losses["adv_loss"] = F.binary_cross_entropy_with_logits(fake_logits, torch.ones_like(fake_logits))
+                
+                # Grab LPIPS loss
+                if args.use_lpips:
+                    ae_losses["lpips_loss"] = lpips(recon, yb.clone())
 
                 # Sum all the losses together to create the total loss and weighting them using the loss_weights object.
                 total_loss = sum([v * loss_weights[k] for k, v in ae_losses.items()])
@@ -311,10 +326,16 @@ def train(args):
                     # Do a forward pass using 'xb', 'yb', tb'
                     _, recon, ae_losses = g_model(xb, yb, tb, use_skips=args.unet_style)
 
+
+
                     # Do a forward pass to get the logits for generated data.
                     fake_logits = d_model(recon)
                     # Compute the loss for the adversarial model.
                     ae_losses["adv_loss"] = F.binary_cross_entropy_with_logits(fake_logits, torch.ones_like(fake_logits))
+                    
+                    # Get LPIPS loss.
+                    if args.use_lpips:
+                        ae_losses["lpips_loss"] = lpips(recon, yb.clone())
                     
                     # Sum all the calculated losses and weight them using the loss_weights dictionary to create the total loss.
                     total_loss = sum([v * loss_weights[k] for k, v in ae_losses.items()])

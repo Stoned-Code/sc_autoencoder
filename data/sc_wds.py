@@ -30,6 +30,8 @@ class Imagenet_1K(SCWDS):
 
     @classmethod
     def get_from_hf(cls, split="train", shardshuffle=1):
+        assert split in cls.SPLIT_LENGTHS
+        
         if split == "test":
             shard = "https://huggingface.co/datasets/Stoned-Code/imagenet-1k_wds/resolve/main/data/imagenet-1k-test-{000000..000999}.tar"
         elif split == "val":
